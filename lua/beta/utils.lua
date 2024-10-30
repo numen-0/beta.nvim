@@ -5,7 +5,7 @@ local M = {}
 ---@param  lines string[]
 ---@param  opts  table?
 ---@return Beta.Object
-M.obj_base = function(lines, opts_def, opts)
+local obj_base = function(lines, opts_def, opts)
     opts = vim.tbl_extend("force", opts_def, opts or {})
     opts.lines = lines
     return opts
@@ -27,6 +27,73 @@ M.list_topics = function(picker, topics)
         :: continue ::
     end
     return tbl
+end
+
+
+local opt_t = {
+    box_lines = false,
+    align     = { offset = 0, style = "center" },
+}
+
+M.center = function(lines, opts)
+    return obj_base(lines, opt_t, opts)
+end
+
+---@param  text   string|string[]
+---@param  author string
+---@param  opts   table?
+---@return Beta.Object
+M.quote = function(text, author, opts)
+    local lines = {}
+    local iter, len = nil, 0
+    -- local len = 64
+    local is_string = type(text) == "string"
+
+    if is_string then
+        ---@diagnostic disable-next-line: param-type-mismatch
+        iter = text:gmatch("([^\n]*)\n?")
+    else
+        ---@diagnostic disable-next-line: param-type-mismatch
+        iter = M.ipairs_wrapper(text)
+    end
+    for line in iter do
+        -- table.insert(lines, string.rep(" ", len - #line) .. line)
+        table.insert(lines, line)
+        local l = M.utf8_len(line)
+        if l > len then
+            len = l
+        end
+
+    end
+    if author then
+        if is_string then table.remove(lines, #lines) end -- chop excess
+        local l = M.utf8_len(author)
+        table.insert(lines, string.rep(" ", len - l) .. author)
+    end
+
+    return M.center(lines, opts)
+end
+
+---@param  text   string
+---@param  author string
+---@param  opts   table?
+---@return Beta.Object
+M.quote_str = function(text, author, len, opts)
+    local lines = {}
+    local iter
+
+    iter = M.ipairs_wrapper(M.separate_lines(text, len))
+
+    for line in iter do
+        local l = M.utf8_len(line)
+        table.insert(lines, string.rep(" ", len - l) .. line)
+    end
+    if author then
+        local l = M.utf8_len(author)
+        table.insert(lines, string.rep(" ", len - l) .. author)
+    end
+
+    return M.center(lines, opts)
 end
 
 -- misc -----------------------------------------------------------------------

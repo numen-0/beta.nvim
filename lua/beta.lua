@@ -16,12 +16,12 @@
 --       - we don’t add any functionality beyond aesthetics, if you want
 --         buttons or shortcuts, you can use the FileType in an autocmd to set
 --         up custom keymaps psudo-buttons.
+--
+-- TODO: clean up utils, maybe add functs to quote objets, and that stuff. For
+--       no it need to be reviewed.
 
 local M = {}
 local utils = require("beta.utils")
-local texts = require("beta.texts")
-local logos = require("beta.logos")
-local presets = require("beta.presets")
 
 ---@enum Align
 M.Align = {
@@ -36,7 +36,7 @@ M.Align = {
 
 ---@class Beta.Align
 ---@field offset integer?
----@field style  Align
+---@field style  Align                 left|center|right
 
 ---@class Beta.Object
 ---@field lines     string[]
@@ -53,63 +53,77 @@ M.Align = {
 ---@field gap           integer
 
 ---@class Beta.Confing
----@field preset        Beta.Preset|string?
+---@field preset        Beta.Preset?   priority: def_conf << preset << opts
 ---@field logo          Beta.Object
 ---@field text          Beta.Object
 ---@field highlight     Beta.Highlight default hl
 ---@field text_list     Beta.Object[]? array off text to randomly pick
 ---@field gap           integer        gap between logo and text
 ---@field v_aling       number @float  [0.0, 1.0]; v_aling the content center
----@field opt_local     table<string, any>
 ---@field user_command  boolean?       generate user a user_cmd ":Beta"
+---@field hide_cursor   boolean?       WARN: this may lead to some visual bugs
+---@field unload_after  boolean?       unload the plugin after it was used (user_command=false)
+
+
+---@type Beta.Object
+M.none = {
+    lines     = {},
+    hl        = "NonText",
+    box_lines = false,
+    align     = nil,
+}
+
+local opt_local = { -- NOTE: I don't know if this sould be "public" ._.
+    ["bufhidden"]      = "wipe",
+    ["buflisted"]      = false,
+    ["buftype"]        = "nofile",
+    ["colorcolumn"]    = '',
+    ["cursorcolumn"]   = false,
+    ["cursorline"]     = false,
+    ["foldcolumn"]     = '0',
+    ["foldlevel"]      = 999,
+    ["list"]           = false,
+    ["matchpairs"]     = "",
+    ["modeline"]       = false,
+    -- ["modifiable"]     = false,
+    ["number"]         = false,
+    ["readonly"]       = false,
+    ["relativenumber"] = false,
+    ["signcolumn"]     = 'no',
+    ["spell"]          = false,
+    ["swapfile"]       = false,
+    ["synmaxcol"]      = 0,
+    ["undofile"]       = false,
+    ["wrap"]           = false,
+}
 
 ---@type Beta.Confing
 local def_conf = {
-    preset = nil,
-    logo = presets.minimal.logo, -- NOTE: need to do this ugly stuff instead of
-    text = presets.minimal.text, --       preset = presets.minimal, because if
-    gap  = presets.minimal.gap,  --       doesn't feel right to do it that way.
-    v_aling = 0.5,
-    highlight = { logo = "String", text = "Comment", },
-    user_command = true,
-    opt_local = {   -- NOTE: I don't know if this sould be "public" ._.
-        ["bufhidden"]      = "wipe",
-        ["buflisted"]      = false,
-        ["buftype"]        = "nofile",
-        ["colorcolumn"]    = '',
-        ["cursorcolumn"]   = false,
-        ["cursorline"]     = false,
-        ["foldcolumn"]     = '0',
-        ["foldlevel"]      = 999,
-        ["list"]           = false,
-        ["matchpairs"]     = "",
-        ["modeline"]       = false,
-        -- ["modifiable"]     = false,
-        ["number"]         = false,
-        ["readonly"]       = false,
-        ["relativenumber"] = false,
-        ["signcolumn"]     = 'no',
-        ["spell"]          = false,
-        ["swapfile"]       = false,
-        ["synmaxcol"]      = 0,
-        ["undofile"]       = false,
-        ["wrap"]           = false,
-    },
+    preset       = nil,
+    logo         = M.none,
+    text         = M.none,
+    gap          = 0,
+    v_aling      = 0.5,
+    highlight    = { logo = "String", text = "Comment", },
+    user_command = false,
+    hide_cursor  = false,
+    unload_after = true,
 }
 ---@type Beta.Confing
 M.config = {
-    preset = nil,
-    logo = logos.none,
-    text = texts.none,
-    text_list = nil,
-    gap = 0,
-    v_aling = 0.5,
-    highlight = { logo = "NonText", text = "NonText", },
-    user_command = true,
-    opt_local = {},
+    preset       = nil,
+    logo         = M.none,
+    text         = M.none,
+    text_list    = nil,
+    gap          = 0,
+    v_aling      = 0.5,
+    highlight    = { logo = "NonText", text = "NonText", },
+    user_command = false,
+    hide_cursor  = false,
+    opt_local    = {},
 }
 
-local group = vim.api.nvim_create_augroup("Beta", {})
+M.group = vim.api.nvim_create_augroup("Beta", {})
 
 local align_map = {
     [M.Align.left]   = utils.align_left,
@@ -201,10 +215,25 @@ local render = function(buf)
     end
 end
 
+local unload_module = function()
+    if not M.config.unload_after then return end
+
+    -- unload the module, and it's submodules
+    package.loaded["beta"] = nil
+
+    for k in pairs(package.loaded) do
+        if k:match('^beta') then
+            package.loaded[k] = nil
+        end
+    end
+    M = nil
+end
+
+
 local set_buf_cmds = function(buf)
     local au = function(event, callback, once, desc)
         return vim.api.nvim_create_autocmd(event, {
-            group    = group,
+            group    = M.group,
             buffer   = buf,
             callback = callback,
             once     = once,
@@ -212,28 +241,33 @@ local set_buf_cmds = function(buf)
         })
     end
 
-    local guicursor = vim.o.guicursor
     au("VimResized", function()
         render(buf)
     end, false, "Refresh beta buf")
 
-    au("BufLeave", function()
-        -- NOTE: the cursorline work if you use cursorline. The guicursor can
-        --       lead to problems, if we go from a beta to another beta
-        vim.o.guicursor = guicursor
-        vim.cmd([[
+    if M.config.hide_cursor then
+        local guicursor = vim.o.guicursor
+        au("BufLeave", function()
+            -- NOTE: the cursorline work if you use cursorline. The guicursor
+            --       can lead to problems, if we go from a beta to another beta
+            vim.o.guicursor = guicursor
+            vim.cmd([[
                 set cursorline
                 hi Cursor blend=0
         ]])
-    end, false, "Unhide cursor")
 
-    au("BufEnter", function()
-        vim.cmd([[
+            pcall(vim.api.nvim_buf_delete, buf, {})
+            unload_module()
+        end, false, "Unhide cursor")
+
+        au("BufEnter", function()
+            vim.cmd([[
                 set nocursorline
                 hi Cursor blend=100
                 set guicursor+=a:Cursor/lCursor
         ]])
-    end, false, "Hide cursor on beta file")
+        end, false, "Hide cursor on beta file")
+    end
 
     -- NOTE: autocmd.txt line 1274
     -- When a buffer is wiped out its buffer-local autocommands are also gone
@@ -248,7 +282,6 @@ local set_buf_cmds = function(buf)
             group = M.group,
             buffer = buf,
         })
-        pcall(vim.api.nvim_buf_delete, buf, {})
     end, true, "On InsertEnter close beta buf")
 end
 
@@ -256,16 +289,15 @@ local set_local_opts = function(_)
     local eventignore = vim.opt.eventignore
     vim.opt.eventignore = 'all'
 
-    for k, v in pairs(M.config.opt_local) do
+    for k, v in pairs(opt_local) do
         vim.opt_local[k] = v
     end
 
     vim.opt.eventignore = eventignore
 
-    -- NOTE: need this, for shortcut stuff
+    -- NOTE: need this, to throw FileType event for shortcut stuff
     vim.opt_local["filetype"] = 'Beta'
 end
-
 
 -- API ------------------------------------------------------------------------
 
@@ -295,17 +327,6 @@ M.setup = function(opts)
     opts = opts or {}
     -- NOTE: priority: def_conf << preset << opts
     if opts.preset then
-        if type(opts.preset) == "string" then
-            if not presets[opts.preset] then
-                vim.api.nvim_err_writeln(string.format(
-                    "beta:setup: theres not a preset named '%s', using 'minimal'",
-                    opts.preset
-                ))
-                opts.preset = presets.minimal
-            else
-                opts.preset = presets[opts.preset]
-            end
-        end
         opts = vim.tbl_extend("keep", opts, opts.preset)
     end
     M.config = vim.tbl_extend("force", def_conf, opts)
@@ -332,10 +353,17 @@ M.setup = function(opts)
     local on_vimenter = function() --- autocmd
         if can_we_act() then
             M.open(true)
+            return
+        end
+        if not M.config.user_command then
+            -- NOTE: only pop at the start so clean if user sets some stuff
+            vim.api.nvim_del_augroup_by_id(M.group)
+
+            unload_module()
         end
     end
     vim.api.nvim_create_autocmd("VimEnter", {
-        group    = group,
+        group    = M.group,
         nested   = true,
         once     = true,
         callback = on_vimenter,
@@ -348,3 +376,45 @@ M.setup = function(opts)
 end
 
 return M
+
+-- NOTE: reminder that this was supposed to be a "quick one-day project"
+-- src: https://www.asciiart.eu/computers/other
+-- *highly modified*
+--                             ____
+--         ____....----''''````    |.
+-- ,'''````            ____....----; '.
+-- | __....----''''````         .-.`'. '.
+-- |.-.    ,_____.--------______| |_  '. '.
+-- `| |   ;,-------._______.----| |-; .-;. |
+--  | |`'-: !-------------------| |,:.| |-='
+--  | |   : !                   | |.: | |
+--  | |   : !              _,,;;| |#: | |
+--  | |   : !       _,,;########| |#: | |
+--  | |   |:!    ,;#############| |;' | |
+--  | |   |:! _,################| |'  | |
+--  | |   | :;###############***| |   | |
+--  | |   | |;##########********| |   | |
+--  | |   | | ;****************;| |   | |
+--  | |   | |  ;**************;'| |   | |
+--  | |   | |   :************:' | |   | |
+--  | |   | |    .:********;'   | |   | |
+--  | |   | |      ':*****;'    | |   | |
+--  | |   | |        ';*;'      | |   | |
+--  | |   | |       ,:'*':,     | |   | |
+--  | |   | |    .:'   *   ':.  | |   | |
+--  | |   | |   :      *      : | |   | |
+--  | |   | |  :       *       :| |   | |
+--  | |   | | :        *        | |   | |
+--  | |   | |:         *        | |   | |
+--  | |   | |:         *        | |   | |
+--  | |   | :          *        | |   | |
+--  | |   |:!          * *      | |   | |
+--  | |   |:!       ,,;**       | |.  | |
+--  | |   : !```'''*********__  | |:  | |
+--  | | ,`: |  _,************ ``| |:--| |-..
+--  | |'  :_.-*****************-| |:  '-' ,|
+--  | |   :  ******************:| |'    .' |
+-- ,;-'_   `-._**************.-'| |   .'  .'
+-- |    ````'''----....___-'    '-' .'  .'
+-- '---....____           ````'''--;  ,'
+--             ````''''----....____|.'

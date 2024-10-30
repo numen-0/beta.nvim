@@ -25,42 +25,48 @@ example installation:
     name = "beta",
     config = function()
         local beta = require("beta")
-        local texts = require("beta.texts")
-        local logos = require("beta.logos")
-        local presets = require("beta.presets")
-        
         beta.setup({
-            logo = require("beta.logos").neo,
-            text = texts.none,
-            text_list = require("beta.utils").list_topics(texts.picker, {
-                "misc",
-                "quotes",
-                "one_piece",
-                "kung_fu_panda",
-            }),
+            logo = {
+                lines = {
+                    [[┳┓    ┓┏•    ]],
+                    [[┃┃┏┓┏┓┃┃┓┏┳┓ ]],
+                    [[┛┗┗ ┗┛┗┛┗┛╹┗•]],
+                },
+                align = { offset = 0, style = "center" },
+            },
+            text = {
+                lines = { [[btw]], },
+                align = { offset = 0, style = "center" },
+            },
+            gap = 0,
+            -- generate user a user_cmd ":Beta"
             user_command = false,
+            -- WARN: this may lead to some visual bugs
+            hide_cursor  = true,
+            -- unload the plugin after it was used (user_command=false)
+            unload_after = true,
         })
 
         -- if you want some keymaps/shorcuts you can do the next
-        -- local group = vim.api.nvim_create_augroup("beta_shortcuts",
-        --         { clear = true })
-        --
-        -- vim.api.nvim_create_autocmd("FileType", {
-        --     pattern = "Beta",
-        --     group = group,
-        --     callback = function()
-        --         local opts = {
-        --             buffer  = true,
-        --             noremap = true,
-        --             desc    = "Beta shortcut"
-        --         }
-        --         local function kmap(m, lhs, rhs)
-        --             vim.keymap.set(m, lhs, rhs, opts)
-        --         end
-        --         kmap('n', "f", require("telescope.builtin").find_files)
-        --         ...
-        --     end,
-        -- })
+        vim.api.nvim_create_autocmd("FileType", {
+            pattern = "Beta",
+            -- NOTE: beta will delete this autocmd if a Beta buffer can't be
+            --       opened (if user_command = false)
+            group = beta.group,
+            callback = function()
+                local opts = {
+                    buffer  = true,
+                    noremap = true,
+                    desc    = "Beta shortcut"
+                }
+                local function kmap(m, lhs, rhs)
+                    vim.keymap.set(m, lhs, rhs, opts)
+                end
+                kmap('n', "f", require("telescope.builtin").find_files)
+                -- ...
+            end,
+            once = true, -- if you have user_command = false
+        })
     end,
 }
 ```
@@ -70,35 +76,15 @@ default config:
 
 ```lua
 {
-    preset = "minimal",
+    preset       = nil,
+    logo         = beta.none,
+    text         = beta.none,
     gap = 0,            -- gap between logo and text
     v_aling = 0.5,      -- number @float [0.0, 1.0]; v_aling the content center
     highlight = { logo = "String", text = "Comment", }, -- default hl
-    user_command = true,
-    opt_local = {
-        ["bufhidden"]      = "wipe",
-        ["buflisted"]      = false,
-        ["buftype"]        = "nofile",
-        ["colorcolumn"]    = '',
-        ["cursorcolumn"]   = false,
-        ["cursorline"]     = false,
-        ["filetype"]       = 'beta',
-        ["foldcolumn"]     = '0',
-        ["foldlevel"]      = 999,
-        ["list"]           = false,
-        ["matchpairs"]     = "",
-        ["modeline"]       = false,
-        -- ["modifiable"]     = false,
-        ["number"]         = false,
-        ["readonly"]       = false,
-        ["relativenumber"] = false,
-        ["signcolumn"]     = 'no',
-        ["spell"]          = false,
-        ["swapfile"]       = false,
-        ["synmaxcol"]      = 0,
-        ["undofile"]       = false,
-        ["wrap"]           = false,
-    },
+    user_command = false,
+    hide_cursor  = false,
+    unload_after = true,
 }
 ```
 
@@ -107,7 +93,13 @@ example custom config:
 ```lua
 {
     logo = require("beta.logos").neo,
-    text = { lines = {"hello world"}, align = { style = M.Align.center, offset = 0 }},
+    text = {
+        lines = { "hello world" },
+        align = {
+            style = require("beta").Align.center,
+            offset = 0
+        }
+    },
     gap = 1,
     v_aling = 0.5,
     highlight = { logo = "String", text = "Comment", },
@@ -122,24 +114,87 @@ Full-setup: [.dotfiles/nvim](https://github.com/numen-0/.dotfiles/tree/main/nvim
 
 ```lua
 {
-    preset = require("beta.presets").minimal,
+    logo = {
+    -- http://www.patorjk.com/software/taag/#p=testall&f=Graffiti&t=NeoVim.
+    -- Font Name: tmplr
+    -- *modified*
+        lines = {
+            [[┳┓    ┓┏•    ]],
+            [[┃┃┏┓┏┓┃┃┓┏┳┓ ]],
+            [[┛┗┗ ┗┛┗┛┗┛╹┗•]],
+        },
+        align = { offset = 0, style = "center" },
+    },
+    text = {
+        lines = { [[btw]], },
+        align = { offset = 0, style = "center" },
+    },
+    gap = 0,
 }
 ```
 ![](img/minimal.png)
 
 ```lua
 {
-    preset = require("beta.presets").basic,
+    -- src: https://github.com/goolord/alpha-nvim/discussions/16?sort=top#discussioncomment-3064967
+    logo = {
+        lines = {
+    [[                                                                     ]],
+    [[      ████ ██████           █████      ██                      ]],
+    [[     ███████████             █████                              ]],
+    [[     █████████ ███████████████████ ███   ███████████    ]],
+    [[    █████████  ███    █████████████ █████ ██████████████    ]],
+    [[   █████████ ██████████ █████████ █████ █████ ████ █████    ]],
+    [[ ███████████ ███    ███ █████████ █████ █████ ████ █████   ]],
+    [[██████  █████████████████████ ████ █████ █████ ████ ██████]],
+        },
+        align = { offset = 0, style = "center" },
+    },
+    text = {
+        lines = {
+            [["An idiot admires complexity, a genius admires simplicity"]],
+            [[                                            Terry A. Davis]],
+        },
+        align = { offset = 0, style = "center" },
+    },
+    gap = 1,
 }
 ```
 ![](img/basic.png)
 
 ```lua
 {
-    preset = require("beta.presets").mix,
+    -- src: https://github.com/goolord/alpha-nvim/discussions/16?sort=new#discussioncomment-10062303
+    -- *modified*
+    logo = {
+        lines = {
+            [[   ███        ███  ]],
+            [[   ████       ████ ]],
+            [[  ████      █████ ]],
+            [[ ██ ████     █████ ]],
+            [[ ███ ████    █████ ]],
+            [[ ████ ████   █████ ]],
+            [[ █████  ████  █████ ]],
+            [[ █████   ████ ████ ]],
+            [[ █████    ████ ███ ]],
+            [[ █████     ████ ██ ]],
+            [[ █████      ████  ]],
+            [[ ████       ████   ]],
+            [[  ███        ███   ]],
+        },
+        align = { offset = 0, style = "center" },
+    },
+    text = {
+        lines = {
+            [["To make something special you just have to believe it's special"]],
+            [[                                                         Mr. Ping]],
+        },
+        align = { offset = 0, style = "center" },
+    },
+    gap = 1,
 }
 ```
-![](img/mix.png)
+![](img/big_n.png)
 
 ## Classes
 ```lua
@@ -156,7 +211,7 @@ M.Align = {
 
 ---@class Beta.Align
 ---@field offset integer?
----@field style  Align
+---@field style  Align                 left|center|right
 
 ---@class Beta.Object
 ---@field lines     string[]
@@ -173,16 +228,16 @@ M.Align = {
 ---@field gap           integer
 
 ---@class Beta.Confing
----@field preset        Beta.Preset|string?
+---@field preset        Beta.Preset?   priority: def_conf << preset << opts
 ---@field logo          Beta.Object
 ---@field text          Beta.Object
 ---@field highlight     Beta.Highlight default hl
 ---@field text_list     Beta.Object[]? array off text to randomly pick
 ---@field gap           integer        gap between logo and text
 ---@field v_aling       number @float  [0.0, 1.0]; v_aling the content center
----@field opt_local     table<string, any>
 ---@field user_command  boolean?       generate user a user_cmd ":Beta"
-
+---@field hide_cursor   boolean?       WARN: this may lead to some visual bugs
+---@field unload_after  boolean?       unload the plugin after it was used (user_command=false)
 ```
 
 ## Credits
