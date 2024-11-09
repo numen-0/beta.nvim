@@ -120,10 +120,9 @@ M.config = {
     highlight    = { logo = "NonText", text = "NonText", },
     user_command = false,
     hide_cursor  = false,
-    opt_local    = {},
 }
 
-M.group = vim.api.nvim_create_augroup("Beta", {})
+M.group = vim.api.nvim_create_augroup("Beta", { clear = true })
 
 local align_map = {
     [M.Align.left]   = utils.align_left,
@@ -254,10 +253,7 @@ local set_buf_cmds = function(buf)
             vim.cmd([[
                 set cursorline
                 hi Cursor blend=0
-        ]])
-
-            pcall(vim.api.nvim_buf_delete, buf, {})
-            unload_module()
+            ]])
         end, false, "Unhide cursor")
 
         au("BufEnter", function()
@@ -269,19 +265,18 @@ local set_buf_cmds = function(buf)
         end, false, "Hide cursor on beta file")
     end
 
-    -- NOTE: autocmd.txt line 1274
-    -- When a buffer is wiped out its buffer-local autocommands are also gone
-    -- au("BufDelete", function() -- this is automatic becuase of
-    --     for id in ipairs(autocmd_ids) do
-    --         pcall(vim.api.nvim_del_autocmd, id)
-    --     end
-    -- end, true, "Delete autocmd")
+    au("BufDelete", function() -- this is automatic becuase of
+        -- NOTE: autocmd.txt line 1274
+        -- When a buffer is wiped out its buffer-local autocommands are also gone
+        unload_module()
+    end, true, "On BufDelete try to unload module")
 
     au("InsertEnter", function()
         vim.api.nvim_exec_autocmds("BufLeave", {
             group = M.group,
             buffer = buf,
         })
+        pcall(vim.api.nvim_buf_delete, buf, {}) -- NOTE: also execs BufDelete
     end, true, "On InsertEnter close beta buf")
 end
 
@@ -326,14 +321,13 @@ end
 M.setup = function(opts)
     opts = opts or {}
     -- NOTE: priority: def_conf << preset << opts
-    if opts.preset then
+    if opts.preset then -- setup conf
         opts = vim.tbl_extend("keep", opts, opts.preset)
     end
     M.config = vim.tbl_extend("force", def_conf, opts)
     M.config.preset = nil
 
-    -- setup text objets
-    if M.config.logo.box_lines then
+    if M.config.logo.box_lines then -- setup text objets
         M.config.logo.lines = utils.box_lines(M.config.logo.lines)
     end
     local list = M.config.text_list
@@ -349,29 +343,29 @@ M.setup = function(opts)
         end
     end
 
-
-    local on_vimenter = function() --- autocmd
-        if can_we_act() then
-            M.open(true)
-            return
-        end
-        if not M.config.user_command then
-            -- NOTE: only pop at the start so clean if user sets some stuff
-            vim.api.nvim_del_augroup_by_id(M.group)
-
-            unload_module()
-        end
-    end
     vim.api.nvim_create_autocmd("VimEnter", {
         group    = M.group,
         nested   = true,
         once     = true,
-        callback = on_vimenter,
+        callback = function() -- autocmd func
+            if can_we_act() then
+                M.open(true)
+                return
+            end
+            if not M.config.user_command then
+                -- NOTE: only pop at the start so clean if user sets some stuff
+                vim.api.nvim_del_augroup_by_id(M.group)
+
+                unload_module()
+            end
+        end,
         desc     = "Open beta on VimEnter"
     })
 
     if M.config.user_command then --- user_cmd
-        vim.api.nvim_create_user_command("Beta", M.open, { desc = "Pop a beta buf" })
+        vim.api.nvim_create_user_command("Beta", M.open, {
+            desc = "Pop a beta buf"
+        })
     end
 end
 

@@ -79,9 +79,9 @@ default config:
     preset       = nil,
     logo         = beta.none,
     text         = beta.none,
-    gap = 0,            -- gap between logo and text
-    v_aling = 0.5,      -- number @float [0.0, 1.0]; v_aling the content center
-    highlight = { logo = "String", text = "Comment", }, -- default hl
+    gap          = 0,   -- gap between logo and text
+    v_aling      = 0.5, -- number @float [0.0, 1.0]; v_aling the content center
+    highlight    = { logo = "String", text = "Comment", }, -- default hl
     user_command = false,
     hide_cursor  = false,
     unload_after = true,
