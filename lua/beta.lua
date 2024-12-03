@@ -17,8 +17,8 @@
 --         buttons or shortcuts, you can use the FileType in an autocmd to set
 --         up custom keymaps psudo-buttons.
 --
--- TODO: clean up utils, maybe add functs to quote objets, and that stuff. For
---       no it need to be reviewed.
+-- TODO: clean up utils, maybe add functs to quote objets, and that stuff???
+--       For now it needs to be reviewed.
 
 local M = {}
 local utils = require("beta.utils")
@@ -98,18 +98,6 @@ local opt_local = { -- NOTE: I don't know if this sould be "public" ._.
 }
 
 ---@type Beta.Confing
-local def_conf = {
-    preset       = nil,
-    logo         = M.none,
-    text         = M.none,
-    gap          = 0,
-    v_aling      = 0.5,
-    highlight    = { logo = "String", text = "Comment", },
-    user_command = false,
-    hide_cursor  = false,
-    unload_after = true,
-}
----@type Beta.Confing
 M.config = {
     preset       = nil,
     logo         = M.none,
@@ -117,9 +105,10 @@ M.config = {
     text_list    = nil,
     gap          = 0,
     v_aling      = 0.5,
-    highlight    = { logo = "NonText", text = "NonText", },
+    highlight    = { logo = "String", text = "Comment", },
     user_command = false,
     hide_cursor  = false,
+    unload_after = true,
 }
 
 M.group = vim.api.nvim_create_augroup("Beta", { clear = true })
@@ -187,12 +176,38 @@ local gen_render = function()
 end
 
 local can_we_act = function()
+    -- src: https://github.com/letieu/btw.nvim/blob/master/lua/btw/init.lua
+    --      H.is_something_shown()
     if vim.fn.argc() > 0 then return false end
 
     for _, buf in pairs(vim.api.nvim_list_bufs()) do
         local bufinfo = vim.fn.getbufinfo(buf)
         if bufinfo.listed == 1 and #bufinfo.windows > 0 then
             return false
+        end
+    end
+    local n_lines = vim.api.nvim_buf_line_count(0)
+    if n_lines > 1 then
+        return false
+    end
+    local first_line = vim.api.nvim_buf_get_lines(0, 0, 1, true)[1]
+    if string.len(first_line) > 0 then
+        return false
+    end
+
+    -- src: https://github.com/goolord/alpha-nvim/blob/main/lua/alpha.lua
+    --      should_skip_alpha()
+    for _, arg in pairs(vim.v.argv) do
+        -- whitelisted arguments: always open
+        if arg == "--startuptime" then return true end
+
+        -- blacklisted arguments: always skip
+        if arg == "-b"
+            -- commands, typically used for scripting
+            or arg == "-c" or vim.startswith(arg, "+")
+            or arg == "-S"
+        then
+            return true
         end
     end
 
@@ -267,7 +282,8 @@ local set_buf_cmds = function(buf)
 
     au("BufDelete", function() -- this is automatic becuase of
         -- NOTE: autocmd.txt line 1274
-        -- When a buffer is wiped out its buffer-local autocommands are also gone
+        --       When a buffer is wiped out its buffer-local autocommands are
+        --       also gone
         unload_module()
     end, true, "On BufDelete try to unload module")
 
@@ -307,10 +323,8 @@ M.open = function(on_vimenter)
     end
 
     set_buf_cmds(buf)
-
     render(buf)
     vim.api.nvim_set_current_buf(buf)
-
     set_local_opts(buf)
 
     if on_vimenter then
@@ -324,7 +338,7 @@ M.setup = function(opts)
     if opts.preset then -- setup conf
         opts = vim.tbl_extend("keep", opts, opts.preset)
     end
-    M.config = vim.tbl_extend("force", def_conf, opts)
+    M.config = vim.tbl_extend("force", M.config, opts)
     M.config.preset = nil
 
     if M.config.logo.box_lines then -- setup text objets
